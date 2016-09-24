@@ -1,14 +1,15 @@
 ###############################################################################
 # ScriptName:           sntxrr's PowerShell profile Configuration
-# Author:               Syntax Error (rrxtns@users.noreply.github.com)
-# Credits:              Gary Burns, Joshua Johnson, Steven Murawski
-# Date Last Modified:   September 14th, 2016 (09/14/2016)
+# Author:               Syntax Error (sntxrr+github@gmail.com)
+# Credits:              Gary Burns, Joshua Johnson, Steven Murawski,
+#                       Bojan Rajkovic
+# Date Last Modified:   September 24th, 2016 (09/24/2016)
 # Description:          Prepares PowerShell environment
 ###############################################################################
 ###############################################################################
 
 #Modules
-Import-Module Azure
+#Import-Module Azure
 Import-Module AzureRM
 
 #Aliases
@@ -47,19 +48,44 @@ function edit($file)
     }
 }
 
-#Customize command prompt to include datetime stamp / user@computer / path
+#Customize command prompt to include datetime stamp / user@computer / path / batter or AC status
 function prompt
 {
+    # battery status swiped from Bojan Rajkovic here:
+    # https://coderinserepeat.com/2015/04/12/customizing-your-prompt-in-powershell/
+    
+    $battery = Get-WmiObject Win32_Battery
+
+    switch ($battery.BatteryStatus) {  
+        { $_ -eq 2 } { $status = "AC" }
+        { $_ -eq 3 -or $_ -eq 4 -or $_ -eq 5 } { $status = null }
+        { $_ -eq 6 -or $_ -eq 7 -or $_ -eq 8 -or $_ -eq 9 } { $status = "Charging" }
+    }
+
+    $time = [timespan]::FromMinutes($battery.EstimatedRunTime).ToString()
+    switch ($battery.EstimatedChargeRemaining) {  
+        { $_ -lt 25 }  { $color = 'red'; break }
+        { $_ -lt 50 }  { $color = 'yellow'; break }
+        default  { $color = 'Cyan' }
+    }
+
+    $realStatus = if ($status -ne $null) { $status } else { $time }
+    $batteryPercentage = $battery.EstimatedChargeRemaining
+    $batterytext = "battery: {0}%, {1}" -f $batteryPercentage, $realStatus
 
     # Set Window Title
     $host.UI.RawUI.WindowTitle = "$ENV:USERNAME@$ENV:COMPUTERNAME - $(Get-Location)"
 
     # Set Prompt
-    Write-Host (Get-Date -Format G) -NoNewline -ForegroundColor Red
-    Write-Host " :: " -NoNewline -ForegroundColor DarkGray
+    Write-host "[" -NoNewline -ForegroundColor DarkGray
+    Write-Host (Get-Date -Format G) -NoNewline -ForegroundColor Yellow
+    Write-Host "] :: [" -NoNewline -ForegroundColor DarkGray
+    Write-Host $batterytext -foreground $color -nonewline 
+    Write-Host "] :: [" -NoNewline -ForegroundColor DarkGray
     Write-Host "$ENV:USERNAME@$ENV:COMPUTERNAME" -NoNewline -ForegroundColor White
-    Write-Host " :: " -NoNewline -ForegroundColor DarkGray
-    Write-Host $(get-location) -ForegroundColor Green
+    Write-Host "] :: [" -NoNewline -ForegroundColor DarkGray
+    Write-Host $(get-location) -NoNewLine -ForegroundColor Green
+    Write-Host "]" -ForegroundColor DarkGray
 
     # Check Running Jobs
     $jobs = Get-Job -State Running
@@ -87,7 +113,7 @@ function prompt
             return " "
         }
         else {
-            Write-Host "jobs:" $jobsCount  -NoNewline -ForegroundColor Gray
+            Write-Host "jobs:" $jobsCount -NoNewline -ForegroundColor Gray
             Write-Host ">" -NoNewline -ForegroundColor Gray
             return " "
         }
